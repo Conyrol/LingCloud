@@ -34,11 +34,9 @@ class TrainManager():
         self.optimizer = AdamW(filter(lambda params: params.requires_grad, self.model.parameters()), lr = base_config.learning_rate)
         t_total = len(dataloader_set.train_dataloader) // base_config.gradient_accumulation_steps * base_config.num_train_epochs
         if base_config.scheduler == "cosine":
-            self.scheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps = 0, num_training_steps = t_total)
-        elif base_config.scheduler == "constant":
-            self.scheduler = get_constant_schedule_with_warmup(self.optimizer, num_warmup_steps = 0)
+            self.scheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps = 0 * t_total, num_training_steps = t_total)
         else:
-            self.scheduler = get_linear_schedule_with_warmup(self.optimizer, num_warmup_steps = 0, num_training_steps = t_total)
+            self.scheduler = get_linear_schedule_with_warmup(self.optimizer, num_warmup_steps = 0 * t_total, num_training_steps = t_total)
         
         # Model save list
         self.save_name_list = [
@@ -191,8 +189,7 @@ class TrainManager():
         `(all stage: qformer + LLM -> hidden_query + CLIP + LLM -> answer)`
         '''
         epoch = params.epoch
-        total_loss = 0.0
-        total_step = 0
+        total_loss, now_step, total_step = 0, 0, 0
         dataloader = self.dataloader_set.train_dataloader
 
         self.model.train()
@@ -218,16 +215,19 @@ class TrainManager():
             total_loss += loss.item()
 
             if (step + 1) % base_config.gradient_accumulation_steps == 0:
-                total_step += 1
+                now_step += 1
                 self.optimizer.step()
-                self.optimizer.zero_grad()
-
                 self.scheduler.step()
+
+                self.optimizer.zero_grad()
                 self.model.zero_grad()
 
-                if total_step % base_config.logging_steps == 0:
-                    print("[Epoch {} | Step {}] average loss: {}".format(epoch, total_step, total_loss / total_step))
-
+                if now_step % base_config.logging_steps == 0:
+                    total_step += now_step
+                    print("[Epoch {} | Step {}] average loss: {}".format(epoch, total_step, total_loss / now_step))
+                    print("[Epoch {} | Step {}] learning rate: {}".format(epoch, total_step, round(self.scheduler.get_last_lr()[0], 4)))
+                    total_loss, now_step = 0, 0
+    
                 if total_step % base_config.save_steps == 0 and total_step > 0:
                     to_save_param = {}
                     for name, params in self.model.named_parameters():
@@ -271,13 +271,15 @@ class TrainManager():
             if (step + 1) % base_config.gradient_accumulation_steps == 0:
                 total_step += 1
                 self.optimizer.step()
-                self.optimizer.zero_grad()
-
                 self.scheduler.step()
+
+                self.optimizer.zero_grad()
                 self.model.zero_grad()
 
                 if total_step % base_config.logging_steps == 0:
                     print("[Epoch {} | Step {}] average loss: {}".format(epoch, total_step, total_loss / total_step))
+                    print("[Epoch {} | Step {}] learning rate: {}".format(epoch, total_step, round(self.scheduler.get_last_lr()[0], 4)))
+                    total_loss, total_step = 0, 0
 
                 if total_step % base_config.save_steps == 0 and total_step > 0:
                     to_save_param = {}
@@ -293,7 +295,12 @@ class TrainManager():
                     )
         return True
 
-    def run(self, run_list: List[Callable], func_params: TrainParams):
+    def run(self, run_list: List[Callable], func_params: TrainParams) -> bool:
         ''' Run the code! '''
         for run_function in run_list:
-            run_function(func_params)
+            try:
+                run_function(func_params)
+            except Exception as e:
+                print(repr(e))
+                return False
+        return True

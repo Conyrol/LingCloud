@@ -39,7 +39,12 @@ class Config(BaseModel):
     ''' The llm path need to load '''
     checkpoint: Optional[str]           = None
     ''' The checkpoint path need to load '''
-    dataset: str                        = "/root/data/mutimodel_dataset/data_split/OCR-VQA/"
+    dataset: str                        = [
+        "/root/data/mutimodel_dataset/data_split/vcr1data",
+        "/root/data/mutimodel_dataset/data_split/scienceqa",
+        "/root/data/mutimodel_dataset/data_split/minigpt4",
+        "/root/data/mutimodel_dataset/data_split/OCR-VQA"
+    ]
     ''' The train dataset path need to load '''
     mme_dataset: Optional[str]          = "./dataset/MME"
     ''' MME eval dataset '''
@@ -64,7 +69,7 @@ class Config(BaseModel):
 
     learning_rate: float                = 1e-4
     '''Learning rate'''
-    scheduler: str                      = "constant"
+    scheduler: str                      = "cosine"
     '''Which learning rate scheduler to use'''
     max_grad_norm: float                = 1.0
     '''Params grad clip'''

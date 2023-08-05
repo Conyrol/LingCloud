@@ -20,27 +20,30 @@ def extract_image_from_zip(zip_path, image_to_extract):
 
 class TrainDataset(Dataset):
     def __init__(self, config: Config, llm_processor: Blip2Processor):
-        dataset_path = config.dataset
+        dataset_path_list = config.dataset
         self.llm_processor = llm_processor
         self.config = config
-
-        with open(os.path.join(dataset_path, 'json/data.json'), 'r') as f:
-            chat_json = f.read()
-        self.json_data = json.loads(chat_json)
-
         self.query = []
         self.answer = []
         self.image_path = []
         self.chunk_path = []
 
-        if config.debug:
-            self.json_data = self.json_data[:1000]
-        
-        for data in self.json_data:
-            self.query.append(data['question'])
-            self.answer.append(data['answer'])
-            self.image_path.append(data['image_path'])
-            self.chunk_path.append(os.path.join(dataset_path, 'image', data['chunk_belong']))
+        for dataset_path in dataset_path_list:
+            with open(os.path.join(dataset_path, 'json/data.json'), 'r') as f:
+                chat_json = f.read()
+            self.json_data = json.loads(chat_json)
+
+            if config.debug:
+                self.json_data = self.json_data[:1000]
+            
+            for data in self.json_data:
+                if 'query' in data:
+                    self.query.append(data['query'])
+                else:
+                    self.query.append(data['question'])
+                self.answer.append(data['answer'])
+                self.image_path.append(data['image_path'])
+                self.chunk_path.append(os.path.join(dataset_path, 'image', data['chunk_belong']))
 
     def __len__(self):
         return len(self.query)
@@ -58,28 +61,36 @@ class TrainDataset(Dataset):
         extracted_image = extract_image_from_zip(chunk_path, image_path)
 
         if self.config.decoder_only:
-            query_prompt = "[Round 0] \n\n问：{query}\n\n答："
-            input_data = query_prompt.format(query = query)
+            query_prompt_fisrt = "[Round 0] \n\n问：{query}"
+            query_prompt_last = "\n\n答："
+            input_data_first = query_prompt_fisrt.format(query = query)
+
             output_data = answer
 
-            token_input = self.llm_processor.tokenizer(input_data, add_special_tokens = False, return_tensors = "pt")
-            input_ids = token_input["input_ids"]
-            input_attention_mask = token_input["attention_mask"]
+            token_input_first = self.llm_processor.tokenizer(input_data_first, add_special_tokens = False, return_tensors = "pt")
+            input_ids_first = token_input_first["input_ids"]
+            input_attention_mask_first = token_input_first["attention_mask"]
+
+            token_input_last = self.llm_processor.tokenizer(query_prompt_last, add_special_tokens = False, return_tensors = "pt")
+            input_ids_last = token_input_last["input_ids"]
+            input_attention_mask_last = token_input_last["attention_mask"]
 
             token_output = self.llm_processor.tokenizer(output_data, add_special_tokens = False, return_tensors = "pt")
             output_ids = token_output["input_ids"]
             output_attention_mask = token_output["attention_mask"]
 
             all_input_ids = torch.cat([
-                input_ids,
+                input_ids_first,
                 torch.full((1, qformer_length), IMG_INDEX),
                 torch.full((1, imgq_token_number), IMG_Q_INDEX),
                 torch.full((1, imgd_token_number), IMG_D_INDEX),
+                input_ids_last
             ], dim = 1)[0].tolist()
 
             input_attention_mask = torch.cat([
-                input_attention_mask,
+                input_attention_mask_first,
                 torch.full((1, qformer_length + imgq_token_number + imgd_token_number), 1),
+                input_attention_mask_last
             ], dim = 1)[0].tolist()
 
             context_length = len(all_input_ids) + 2 # gmask and sop tokens

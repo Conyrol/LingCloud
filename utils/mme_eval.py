@@ -52,30 +52,36 @@ class MMEvalDataset(Dataset):
                     for text in text_data:
                         if text == '': continue
                         query, answer = text.split('\t')[:2]
-                        query_prompt = "[Round 0] \n\n问：{query}\n\n答："
-                        input_data = query_prompt.format(query = query)
+                        query_prompt_fisrt = "[Round 0] \n\n问：{query}"
+                        query_prompt_last = "\n\n答："
+                        input_data_first = query_prompt_fisrt.format(query = query)
 
-                        token_input = self.llm_processor.tokenizer(input_data, add_special_tokens = True, return_tensors = "pt")
-                        input_ids = token_input["input_ids"]
-                        input_attention_mask = token_input["attention_mask"]
+                        token_input_first = self.llm_processor.tokenizer(input_data_first, add_special_tokens = True, return_tensors = "pt")
+                        input_ids_first = token_input_first["input_ids"]
+                        input_attention_mask_first = token_input_first["attention_mask"]
+
+                        token_input_last = self.llm_processor.tokenizer(query_prompt_last, add_special_tokens = False, return_tensors = "pt")
+                        input_ids_last = token_input_last["input_ids"]
+                        input_attention_mask_last = token_input_last["attention_mask"]
 
                         all_input_ids = torch.cat([
-                            input_ids,
+                            input_ids_first,
                             torch.full((1, qformer_length), IMG_INDEX),
                             torch.full((1, imgq_token_number), IMG_Q_INDEX),
                             torch.full((1, imgd_token_number), IMG_D_INDEX),
+                            input_ids_last
                         ], dim = 1)[0].tolist()
 
                         input_attention_mask = torch.cat([
-                            input_attention_mask,
+                            input_attention_mask_first,
                             torch.full((1, qformer_length + imgq_token_number + imgd_token_number), 1),
+                            input_attention_mask_last
                         ], dim = 1)[0].tolist()
 
                         # padding_side left
                         padding_length = self.config.padding - len(all_input_ids)
                         new_all_input_ids = [0] * padding_length + all_input_ids
                         input_attention_mask = [0] * padding_length + input_attention_mask
-
 
                         self.all_inputs.append(torch.tensor(new_all_input_ids))
                         self.all_images.append(image)
