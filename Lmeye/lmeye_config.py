@@ -25,7 +25,7 @@ class Config(BaseModel):
     ''' If debug = True, use a small dataset to test program '''
     decoder_only: bool                  = True
     ''' LLM type: encoder-decoder or decoder-only '''
-    model_type: str                     = "GLMv2"
+    model_type: str                     = "FLAN-T5"
     ''' Support model type ["FLAN-T5", "GLMv2"], more models will be supported in the future🤗.'''
     imgq_number: int                    = 1
     ''' The number of <img-q>, recommand 1'''
@@ -35,7 +35,7 @@ class Config(BaseModel):
     # Path config: model path, dataset path and checkpoint path
     output_dir: str                     = './output'
     ''' The path to save models '''
-    llm_path: str                       = "/root/data/model/blip2-GLM"  #"/root/data/model/blip2-flan-t5-xl"
+    llm_path: str                       = "/root/data/model/blip2-flan-t5-xl"#"/root/data/model/blip2-GLM"  #"/root/data/model/blip2-flan-t5-xl"
     ''' The llm path need to load '''
     checkpoint: Optional[str]           = None
     ''' The checkpoint path need to load '''
@@ -43,7 +43,15 @@ class Config(BaseModel):
         "/root/data/mutimodel_dataset/data_split/vcr1data",
         "/root/data/mutimodel_dataset/data_split/scienceqa",
         "/root/data/mutimodel_dataset/data_split/minigpt4",
-        "/root/data/mutimodel_dataset/data_split/OCR-VQA"
+        "/root/data/mutimodel_dataset/data_split/OCR-VQA",
+        "/root/data/mutimodel_dataset/data_split/coco",
+        "/root/data/mutimodel_dataset/data_split/VisualDialog",
+        "/root/data/mutimodel_dataset/data_split/LRV-Instruction",
+        "/root/data/mutimodel_dataset/data_split/iconqa",
+        "/root/data/mutimodel_dataset/data_split/flickr30K",
+        "/root/data/mutimodel_dataset/data_split/okvqa",
+        "/root/data/mutimodel_dataset/data_split/vqav2",
+        "/root/data/mutimodel_dataset/data_split/vsr"
     ]
     ''' The train dataset path need to load '''
     mme_dataset: Optional[str]          = "./dataset/MME"
@@ -52,7 +60,7 @@ class Config(BaseModel):
     ''' MMBench eval dataset '''
 
     # Training config                 
-    num_samples: int                    = 20000
+    num_samples: int                    = 40000
     '''The number of data sampled from the training set in one training epoch'''
     num_train_epochs: int               = 20
     '''The number of train epochs'''
@@ -60,7 +68,7 @@ class Config(BaseModel):
     '''The max padding number'''
     batch_size: int                     = 8
     '''Train/eval batch size'''
-    gradient_accumulation_steps: int    = 4
+    gradient_accumulation_steps: int    = 1
     '''Train gradient accumulation steps'''
     logging_steps: int                  = 20
     '''Logging steps'''

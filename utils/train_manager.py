@@ -128,10 +128,6 @@ class TrainManager():
 
         for step, batch in enumerate(dataloader):
             with torch.no_grad():
-                text = ["! " * 37] * batch["inputs"].size(0)
-                clip_text = self.clip_tokenizer(text, return_tensors = "pt")
-                clip_text_ids = clip_text["input_ids"].cuda()
-                
                 generate_ids = self.model.first_stage_generate(
                     input_ids = batch["inputs"].squeeze().cuda(),
                     pixel_values =  batch["image"].cuda(),
@@ -253,6 +249,8 @@ class TrainManager():
 
         self.model.train()
         for step, batch in enumerate(dataloader):
+            self.optimizer.zero_grad()
+
             model_output = self.model.first_stage_forward(
                 labels = batch['target'].squeeze().cuda(),
                 input_ids = batch["inputs"].squeeze().cuda(),
@@ -260,26 +258,44 @@ class TrainManager():
                 attention_mask = batch["attention_mask"].squeeze().cuda(),
             )   
             loss: torch.FloatTensor = model_output.loss
-            
+
             if base_config.gradient_accumulation_steps > 1:
                 loss = loss / base_config.gradient_accumulation_steps
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), base_config.max_grad_norm)
+            # torch.nn.utils.clip_grad_norm_(self.model.parameters(), base_config.max_grad_norm)
             total_loss += loss.item()
             
             if (step + 1) % base_config.gradient_accumulation_steps == 0:
                 total_step += 1
-                self.optimizer.step()
-                self.scheduler.step()
-
-                self.optimizer.zero_grad()
-                self.model.zero_grad()
-
                 if total_step % base_config.logging_steps == 0:
                     print("[Epoch {} | Step {}] average loss: {}".format(epoch, total_step, total_loss / total_step))
                     print("[Epoch {} | Step {}] learning rate: {}".format(epoch, total_step, round(self.scheduler.get_last_lr()[0], 4)))
+                    with torch.no_grad():
+                        generate_ids = self.model.first_stage_generate(
+                            input_ids = batch["inputs"].squeeze().cuda(),
+                            pixel_values =  batch["image"].cuda(),
+                            attention_mask = batch["attention_mask"].squeeze().cuda(),
+                            num_beams = 5,
+                            temperature = 0.2,
+                            top_p = 1,
+                            top_k = 3,
+                            max_new_tokens = 128,
+                        )
+                        inputs = batch["inputs"].squeeze().clone()
+                        target = batch['target'].squeeze().clone()
+                        inputs[inputs < 0] = 0
+                        target[target < 0] = 0
+                        input_data = self.processor.batch_decode(inputs, skip_special_tokens = True, clean_up_tokenization_spaces = True)
+                        ground_truth = self.processor.batch_decode(target, skip_special_tokens = True, clean_up_tokenization_spaces = True)
+                        output = self.processor.batch_decode(generate_ids, skip_special_tokens = True, clean_up_tokenization_spaces = False)
+                        for index, i in enumerate(input_data):
+                            print("{}: {} | {}".format(i, ground_truth[index], output[index]))
+
                     total_loss, total_step = 0, 0
+
+                self.optimizer.step()
+                self.scheduler.step()
 
                 if total_step % base_config.save_steps == 0 and total_step > 0:
                     to_save_param = {}

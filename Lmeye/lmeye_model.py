@@ -157,8 +157,8 @@ class Blip2InstructionQueryModel(Blip2PreTrainedModel):
 
         input_embedding = self.language_model.get_input_embeddings()(input_ids)
         input_embedding[tmp_ids == IMG_INDEX] += qformer_embedding.view(-1, qformer_embedding.shape[-1])
-        input_embedding[tmp_ids == IMG_Q_INDEX] += self.instruction_embedding_imgq
-        input_embedding[tmp_ids == IMG_D_INDEX] += self.instruction_embedding_imgd
+        # input_embedding[tmp_ids == IMG_Q_INDEX] += self.instruction_embedding_imgq
+        # input_embedding[tmp_ids == IMG_D_INDEX] += self.instruction_embedding_imgd
 
         return input_embedding, attention_mask, vision_outputs, query_outputs
 
@@ -187,13 +187,25 @@ class Blip2InstructionQueryModel(Blip2PreTrainedModel):
             return_dict = return_dict
         )
 
-        outputs = self.language_model(
-            input_ids = None,
-            inputs_embeds = inputs_embedding.half(),
-            attention_mask = attention_mask,
-            return_dict = return_dict,
-            labels = labels,
-        )
+        if base_config.decoder_only:
+            outputs = self.language_model(
+                input_ids = None,
+                inputs_embeds = inputs_embedding.half(),
+                attention_mask = attention_mask,
+                return_dict = return_dict,
+                labels = labels,
+            )
+        else:
+            outputs = self.language_model(
+                inputs_embeds = inputs_embedding,
+                attention_mask = attention_mask,
+                decoder_input_ids = decoder_input_ids,
+                decoder_attention_mask = decoder_attention_mask,
+                output_attentions = output_attentions,
+                output_hidden_states = output_hidden_states,
+                return_dict = return_dict,
+                labels = labels,
+            )
         
         loss = outputs.loss if return_dict else outputs[0]
         logits = outputs.logits if return_dict else outputs[1]
@@ -221,13 +233,19 @@ class Blip2InstructionQueryModel(Blip2PreTrainedModel):
             pixel_values = pixel_values,
             attention_mask = attention_mask,
         )
-
-        outputs = self.language_model.generate(
-            inputs_embeds = inputs_embedding.half(),
-            attention_mask = attention_mask,
-            bos_token_id = 1,
-            **generate_kwargs,
-        )
+        if base_config.decoder_only:
+            outputs = self.language_model.generate(
+                inputs_embeds = inputs_embedding.half(),
+                attention_mask = attention_mask,
+                bos_token_id = 1,
+                **generate_kwargs,
+            )
+        else:
+            outputs = self.language_model.generate(
+                inputs_embeds = inputs_embedding,
+                attention_mask = attention_mask,
+                **generate_kwargs,
+            )
 
         return outputs
 

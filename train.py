@@ -45,8 +45,8 @@ def train(
 
     for epoch in range(base_config.num_train_epochs):
         train_manager.run([
-            train_manager.train,
-            train_manager.mme_eval,
+            train_manager.first_stage_train,
+            train_manager.mme_first_stage_eval,
         ], TrainParams(epoch = epoch))
 
 def main():
@@ -92,7 +92,7 @@ def main():
     llm_model = llm_model.cuda()
 
     # 冻结层
-    # llm_model.query_tokens.requires_grad = False
+    llm_model.query_tokens.requires_grad = False
     # for name, parameter in llm_model.language_projection.named_parameters():
     #    parameter.requires_grad = False
 
