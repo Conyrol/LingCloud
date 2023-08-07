@@ -61,8 +61,8 @@ class TrainDataset(Dataset):
         extracted_image = extract_image_from_zip(chunk_path, image_path)
 
         if self.config.decoder_only:
-            query_prompt_fisrt = "[Round 0] \n\n问：{query}"
-            query_prompt_last = "\n\n答："
+            query_prompt_fisrt = "[Round 0] \n\nQ: {query}"
+            query_prompt_last = "\n\nA: "
             input_data_first = query_prompt_fisrt.format(query = query)
 
             output_data = answer
@@ -79,9 +79,10 @@ class TrainDataset(Dataset):
             output_ids = token_output["input_ids"]
             output_attention_mask = token_output["attention_mask"]
 
+            # whether_first_stage = True
             all_input_ids = torch.cat([
-                input_ids_first,
                 torch.full((1, qformer_length), IMG_INDEX),
+                input_ids_first,
                 torch.full((1, imgq_token_number), IMG_Q_INDEX),
                 torch.full((1, imgd_token_number), IMG_D_INDEX),
                 input_ids_last
@@ -96,7 +97,8 @@ class TrainDataset(Dataset):
             context_length = len(all_input_ids) + 2 # gmask and sop tokens
             new_all_input_ids = self.llm_processor.tokenizer.build_inputs_with_special_tokens(all_input_ids, output_ids[0].tolist())
             output_ids = new_all_input_ids[context_length: ]
-            
+            special_words = new_all_input_ids[:2]
+
             # padding_side left
             padding_length = self.config.padding - len(new_all_input_ids)
             target = [IGNORE_INDEX] * (context_length + padding_length) + output_ids
@@ -104,11 +106,14 @@ class TrainDataset(Dataset):
             # [1] * 3 is the characters occupied by special tokens in ChatGLM.
             input_attention_mask = [0] * padding_length + input_attention_mask + output_attention_mask[0].tolist() + [1] * 3
 
+            test_inputs = (self.config.padding - len(all_input_ids) - 2) * [0] + special_words + all_input_ids
+
             return {
                 "inputs": torch.tensor(new_all_input_ids),
                 "target": torch.tensor(target),
                 "image": self.llm_processor(images = extracted_image, return_tensors = "pt", padding = True)['pixel_values'][0],
                 "attention_mask": torch.tensor(input_attention_mask),
+                "test_inputs": torch.tensor(test_inputs)
             }
         else:
             query_prompt = "Human: {query} Assistant: "

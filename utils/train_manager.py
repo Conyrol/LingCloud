@@ -273,7 +273,7 @@ class TrainManager():
                     print("[Epoch {} | Step {}] learning rate: {}".format(epoch, total_step, round(self.scheduler.get_last_lr()[0], 4)))
                     with torch.no_grad():
                         generate_ids = self.model.first_stage_generate(
-                            input_ids = batch["inputs"].squeeze().cuda(),
+                            input_ids = batch["test_inputs"].squeeze().cuda(),
                             pixel_values =  batch["image"].cuda(),
                             attention_mask = batch["attention_mask"].squeeze().cuda(),
                             num_beams = 5,
@@ -282,7 +282,7 @@ class TrainManager():
                             top_k = 3,
                             max_new_tokens = 128,
                         )
-                        inputs = batch["inputs"].squeeze().clone()
+                        inputs = batch["test_inputs"].squeeze().clone()
                         target = batch['target'].squeeze().clone()
                         inputs[inputs < 0] = 0
                         target[target < 0] = 0
@@ -290,8 +290,7 @@ class TrainManager():
                         ground_truth = self.processor.batch_decode(target, skip_special_tokens = True, clean_up_tokenization_spaces = True)
                         output = self.processor.batch_decode(generate_ids, skip_special_tokens = True, clean_up_tokenization_spaces = False)
                         for index, i in enumerate(input_data):
-                            print("{}: {} | {}".format(i, ground_truth[index], output[index]))
-
+                            print("{} {} || {}".format(i.replace('\n', ''), ground_truth[index].replace('\n', ''), output[index].replace('\n', '')))
                     total_loss, total_step = 0, 0
 
                 self.optimizer.step()

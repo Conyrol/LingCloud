@@ -25,7 +25,7 @@ class Config(BaseModel):
     ''' If debug = True, use a small dataset to test program '''
     decoder_only: bool                  = True
     ''' LLM type: encoder-decoder or decoder-only '''
-    model_type: str                     = "FLAN-T5"
+    model_type: str                     = "GLMv2"
     ''' Support model type ["FLAN-T5", "GLMv2"], more models will be supported in the future🤗.'''
     imgq_number: int                    = 1
     ''' The number of <img-q>, recommand 1'''
@@ -35,7 +35,7 @@ class Config(BaseModel):
     # Path config: model path, dataset path and checkpoint path
     output_dir: str                     = './output'
     ''' The path to save models '''
-    llm_path: str                       = "/root/data/model/blip2-flan-t5-xl"#"/root/data/model/blip2-GLM"  #"/root/data/model/blip2-flan-t5-xl"
+    llm_path: str                       = "/root/data/model/blip2-GLM"  #"/root/data/model/blip2-flan-t5-xl"
     ''' The llm path need to load '''
     checkpoint: Optional[str]           = None
     ''' The checkpoint path need to load '''
@@ -66,11 +66,11 @@ class Config(BaseModel):
     '''The number of train epochs'''
     padding: int                        = 256
     '''The max padding number'''
-    batch_size: int                     = 8
+    batch_size: int                     = 4
     '''Train/eval batch size'''
     gradient_accumulation_steps: int    = 1
     '''Train gradient accumulation steps'''
-    logging_steps: int                  = 20
+    logging_steps: int                  = 40
     '''Logging steps'''
     save_steps: int                     = 1000
     '''Save steps'''
